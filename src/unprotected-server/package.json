@@ -1,0 +1,20 @@
+{
+  "name": "approov-nodejs-koa-quickstart",
+  "version": "1.0.0",
+  "description": "Approov quickstart for the NodeJS Koa framework.",
+  "main": "./hello-server-unprotected.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node ./hello-server-unprotected.js"
+  },
+  "author": "paulos@criticalblue.com",
+  "license": "MIT",
+  "dependencies": {
+    "koa": "^2.13.0",
+    "koa-logger": "^3.2.1",
+    "koa-compress": "^5.0.1",
+    "koa-router": "^9.4.0",
+    "dotenv": "^8.2.0"
+  },
+  "devDependencies": {}
+}
