@@ -128,14 +128,10 @@ const verifyApproovToken = async (ctx, next) => {
 }
 
 const verifyApproovTokenBinding = async (ctx, next) => {
-  // Note that the `pay` claim will, under normal circumstances, be present,
-  // but if the Approov failover system is enabled, then no claim will be
-  // present, and in this case you want to continue processing the request,
-  // otherwise you will not be able to benefit from the redundancy afforded by
-  // the failover system.
   if (!("pay" in ctx.approovTokenClaims)) {
     // You may want to add some logging here.
-    await next()
+    ctx.status = 401
+    ctx.body = {}
     return
   }
 

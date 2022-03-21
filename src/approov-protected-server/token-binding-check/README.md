@@ -50,6 +50,28 @@ Now, you can run this example from the `src/approov-protected-server/token-bindi
 npm start
 ```
 
+Next, you can test that it works with:
+
+```bash
+curl -iX GET 'http://localhost:8002'
+```
+
+The response will be a `401` unauthorized request:
+
+```text
+HTTP/1.1 401 Unauthorized
+Vary: Accept-Encoding
+Content-Type: application/json; charset=utf-8
+Content-Length: 2
+Date: Mon, 21 Mar 2022 19:11:52 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{}
+```
+
+The reason you got a `401` is because no Approoov token isn't provided in the headers of the request.
+
 Finally, you can test that the Approov integration example works as expected with this [Postman collection](/README.md#testing-with-postman) or with some cURL requests [examples](/README.md#testing-with-curl).
 
 [TOC](#toc---table-of-contents)
