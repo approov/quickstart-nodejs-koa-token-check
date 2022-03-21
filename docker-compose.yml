@@ -5,8 +5,6 @@ services:
   unprotected-server:
     image: approov/nodejs-express:17.7.1
     build: ./
-    environment:
-      - DEBUG=hello-server
     networks:
       - default
     command: sh -c "npm install && npm start"
@@ -18,8 +16,6 @@ services:
   approov-token-check:
     image: approov/nodejs-express:17.7.1
     build: ./
-    environment:
-      - DEBUG=hello-server
     networks:
       - default
     command: sh -c "npm install && npm start"
@@ -31,8 +27,6 @@ services:
   approov-token-binding-check:
     image: approov/nodejs-express:17.7.1
     build: ./
-    environment:
-      - DEBUG=hello-server
     networks:
       - default
     command: sh -c "npm install && npm start"
