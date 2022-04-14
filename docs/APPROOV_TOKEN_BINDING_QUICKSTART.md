@@ -14,14 +14,14 @@ This quickstart is for developers familiar with the NodeJS Koa framework who are
 
 ## Why?
 
-To lock down your API server to your mobile app. Please read the brief summary in the [README](/README.md#why) at the root of this repo or visit our [website](https://approov.io/product.html) for more details.
+To lock down your API server to your mobile app. Please read the brief summary in the [Approov Overview](/OVERVIEW.md#why) at the root of this repo or visit our [website](https://approov.io/product) for more details.
 
 [TOC](#toc---table-of-contents)
 
 
 ## How it works?
 
-For more background, see the overview in the [README](/README.md#how-it-works) at the root of this repository.
+For more background, see the [Approov Overview](/OVERVIEW.md#how-it-works) at the root of this repository.
 
 The main functionality for the Approov token binding check is in the file [src/approov-protected-server/token-binding-check/hello-server-protected.js](/src/approov-protected-server/token-binding-check/hello-server-protected.js). Take a look at the `verifyApproovToken()` and `verifyApproovTokenBinding()` functions to see the simple code for the checks.
 
@@ -109,7 +109,8 @@ const verifyApproovToken = async (ctx, next) => {
     return
   }
 
-  // decode token, verify secret and check exp
+  // Decode the token with strict verification of the signature (['HS256']) to
+  // prevent against the `none` algorithm attack.
   await jwt.verify(appoovToken, approovSecret, { algorithms: ['HS256'] }, function(err, decoded) {
     if (err) {
       // You may want to add some logging here.
@@ -167,13 +168,13 @@ const verifyApproovTokenBinding = async (ctx, next) => {
 Now you just need to add both functions as a middleware for the endpoints you want to protected:
 
 ```javascript
-// @IMPORTANT: Always add the `verifyApproovToken` and `verifyApproovTokenBinding`
-//             functions as middleware before your endpoints declaration.
+// @IMPORTANT: Always add the `verifyApproovToken` middleware function before
+//             your endpoints declaration.
 //
-// Using `["/"]` protects all endpoints in your API.
-// To protect only specific endpoints use as `["/checkout", "/payments", "/etc"]`.
-// For example when adding the `/payments` endpoint you are also protecting any
-// child endpoints of it.
+// Using `["/"]` protects all endpoints in your API. Example to protect only
+// specific endpoints: `["/checkout", "/payments", "/etc"]`.
+// When adding an endpoint `/example` you are also protecting their child
+// endpoints, like `/example/content`, `/example/content/:id`, etc. .
 router.use(["/"], verifyApproovToken)
 router.use(["/"], verifyApproovTokenBinding)
 ```

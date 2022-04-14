@@ -34,7 +34,8 @@ const verifyApproovToken = async (ctx, next) => {
     return
   }
 
-  // decode token, verify secret and check exp
+  // Decode the token with strict verification of the signature (['HS256']) to
+  // prevent against the `none` algorithm attack.
   await jwt.verify(appoovToken, approovSecret, { algorithms: ['HS256'] }, function(err, decoded) {
     if (err) {
       // You may want to add some logging here.
@@ -66,13 +67,13 @@ api.use(async (ctx, next) => {
 api.use(router.routes())
 api.use(router.allowedMethods())
 
-// @IMPORTANT: Always add the `verifyApproovToken` function as middleware before
+// @IMPORTANT: Always add the `verifyApproovToken` middleware function before
 //             your endpoints declaration.
 //
-// Using `["/"]` protects all endpoints in your API.
-// To protect only specific endpoints use as `["/checkout", "/payments", "/etc"]`.
-// For example when adding the `/payments` endpoint you are also protecting any
-// child endpoints of it.
+// Using `["/"]` protects all endpoints in your API. Example to protect only
+// specific endpoints: `["/checkout", "/payments", "/etc"]`.
+// When adding an endpoint `/example` you are also protecting their child
+// endpoints, like `/example/content`, `/example/content/:id`, etc. .
 router.use(["/"], verifyApproovToken)
 
 router.get('/', async ctx => {
