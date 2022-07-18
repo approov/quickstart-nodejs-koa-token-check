@@ -99,9 +99,9 @@ const approovSecret = Buffer.from(approovBase64Secret, 'base64')
 
 const verifyApproovToken = async (ctx, next) => {
 
-  const appoovToken = ctx.headers['approov-token']
+  const approovToken = ctx.headers['approov-token']
 
-  if (!appoovToken) {
+  if (!approovToken) {
     // You may want to add some logging here.
     ctx.status = 401
     ctx.body = {}
@@ -110,7 +110,7 @@ const verifyApproovToken = async (ctx, next) => {
 
   // Decode the token with strict verification of the signature (['HS256']) to
   // prevent against the `none` algorithm attack.
-  await jwt.verify(appoovToken, approovSecret, { algorithms: ['HS256'] }, function(err, decoded) {
+  await jwt.verify(approovToken, approovSecret, { algorithms: ['HS256'] }, function(err, decoded) {
     if (err) {
       // You may want to add some logging here.
       ctx.status = 401

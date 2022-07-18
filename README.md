@@ -13,7 +13,7 @@ The quickstart was tested with the following Operating Systems:
 * MacOS Big Sur
 * Windows 10 WSL2 - Ubuntu 20.04
 
-First, setup the [Appoov CLI](https://approov.io/docs/latest/approov-installation/index.html#initializing-the-approov-cli).
+First, setup the [Approov CLI](https://approov.io/docs/latest/approov-installation/index.html#initializing-the-approov-cli).
 
 Now, register the API domain for which Approov will issues tokens:
 
@@ -27,7 +27,7 @@ Next, enable your Approov `admin` role with:
 eval `approov role admin`
 ````
 
-Now, get your Approov Secret with the [Appoov CLI](https://approov.io/docs/latest/approov-installation/index.html#initializing-the-approov-cli):
+Now, get your Approov Secret with the [Approov CLI](https://approov.io/docs/latest/approov-installation/index.html#initializing-the-approov-cli):
 
 ```bash
 approov secret -get base64
@@ -64,9 +64,9 @@ Next, verify the Approov token:
 ```javascript
 const verifyApproovToken = async (ctx, next) => {
 
-  const appoovToken = ctx.headers['approov-token']
+  const approovToken = ctx.headers['approov-token']
 
-  if (!appoovToken) {
+  if (!approovToken) {
     // You may want to add some logging here.
     ctx.status = 401
     ctx.body = {}
@@ -75,7 +75,7 @@ const verifyApproovToken = async (ctx, next) => {
 
   // Decode the token with strict verification of the signature (['HS256']) to
   // prevent against the `none` algorithm attack.
-  await jwt.verify(appoovToken, approovSecret, { algorithms: ['HS256'] }, function(err, decoded) {
+  await jwt.verify(approovToken, approovSecret, { algorithms: ['HS256'] }, function(err, decoded) {
     if (err) {
       // You may want to add some logging here.
       ctx.status = 401
