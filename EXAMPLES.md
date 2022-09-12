@@ -27,12 +27,10 @@ If you decide to use the docker stack then you need to bear in mind that the Pos
 Do not forget to properly setup the `.env` file in the root of each Approov protected server example before you run the server with the docker stack.
 
 ```bash
-cp src/unprotected-server/.env.example src/unprotected-server/.env
-cp src/approov-protected-server/token-check/.env.example src/approov-protected-server/token-check/.env
-cp src/approov-protected-server/token-binding-check/.env.example src/approov-protected-server/token-binding-check/.env
+cp .env.example .env
 ```
 
-Edit each file and add the [dummy secret](/TESTING.md#the-dummy-secret) to it in order to be able to test the Approov integration with the provided [Postman collection](https://github.com/approov/postman-collections/blob/master/quickstarts/hello-world/hello-world.postman_curl_requests_examples.md).
+Edit the file and add the [dummy secret](/TESTING.md#the-dummy-secret) to it in order to be able to test the Approov integration with the provided [Postman collection](https://github.com/approov/postman-collections/blob/master/quickstarts/hello-world/hello-world.postman_curl_requests_examples.md).
 
 
 ### Build the Docker Stack
