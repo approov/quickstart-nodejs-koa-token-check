@@ -10,7 +10,7 @@
   "author": "paulos@criticalblue.com",
   "license": "MIT",
   "dependencies": {
-    "koa": "^2.13.0",
+    "koa": "^2.15.4",
     "koa-logger": "^3.2.1",
     "koa-compress": "^5.0.1",
     "koa-router": "^9.4.0",
