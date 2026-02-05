@@ -7,11 +7,22 @@ This project provides a server-side example of Approov token verification for a 
 - `/token-binding` - requires a valid Approov token which is bound to a header value.
 - `/token-double-binding` - requires a valid Approov token which is bound to two header values.
 
-<!-- Generic version:   -->
-In this example, Approov protection is provided by [`{{DECORATOR_FUNCTION_NAME}}`]({{DECORATOR_LINK}}). The level of protection is configured per endpoint via the decorator parameters, as shown in [`{{ENDPOINT_CONFIG_NAME}}`]({{ENDPOINT_EXAMPLE_LINK}}).
+In this example, Approov token check is implemented in `ApproovApplication.js`. The responsibilities break down as follows:
 
-<!-- Language specific version:  
-In this example, Approov protection is provided by [ApproovAuthenticationProvider.java](https://github.com/KMilej/quickstart-java-spring-token-check/blob/c26a41a262c5db6e57f0eeec83b6db699b70bfc4/src/main/java/com/criticalblue/approov/jwt/authentication/ApproovAuthenticationProvider.java#L15-L43). This is chained into Spring's HttpSecurity web builder in [WebSecurityConfig.java](https://github.com/KMilej/quickstart-java-spring-token-check/blob/c26a41a262c5db6e57f0eeec83b6db699b70bfc4/src/main/java/com/criticalblue/approov/jwt/WebSecurityConfig.java#L47-L82). -->
+1. **JWT Approov Token validation (signature + expiry)** is implemented in [verifyApproovToken (JWT verification)](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L229-L241)
+It verifies the HS256 signature and rejects tokens that are missing or past `exp`.
+
+2. **Token binding (pay + hash)** is handled by [isBindingValid + computeBindingHash](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L125-L146)
+It computes `base64(sha256(binding_value))` and compares it to `pay` with a timing-safe match.
+
+3. **Middleware enforcement** is done by [verifyApproovToken + failUnauthorized](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L203-L257)
+Requests without valid token/binding are rejected with 401.
+
+4. **Binding value selection (what gets hashed)** is in [getBindingHeaders + getBindingValue](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L155-L182) It uses the headers configured in `ROUTE_BINDING_HEADERS` (currently `Authorization` for single binding, or `Authorization` + `SessionId` for double binding).
+
+5. **Protected route requirements** are defined in [ROUTE_BINDING_HEADERS](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L24-L27)
+
+6. **Protected routes are registered** in [router.use([...], verifyApproovToken)]([ApproovApplication.js](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js)#L282-L282)
 
 ## Approov Token Verification Flow
 
@@ -33,8 +44,8 @@ In this example, Approov protection is provided by [ApproovAuthenticationProvide
    The protected API then computes the same hash from the incoming request and verifies that it matches the `pay` claim, preventing token reuse or replay attacks. For local testing, you can also generate example tokens with a binding using the Approov CLI.
 
 5. **Request Decision:**   
-   If all checks pass → the request is trusted and processed `200 OK`.   
-   If validation fails → the server responds with `401 Unauthorized`.
+      If all checks pass → the request is trusted and processed `200 OK`.   
+      If validation fails → the server responds with `401 Unauthorized`.
 
 ## Requirements:
 
@@ -82,7 +93,7 @@ bash test.sh
 This script:
 - Verifies that the `approov` and `curl` commands are installed.
 - Checks Approov status by calling `/approov-state` (enabled vs disabled).
-- Runs endpoint tests against `/unprotected` (no token), `/token-check` (valid/invalid Approov tokens), `/token-binding` (token bound to `Authorization`), and `/token-double-binding` (token bound to `Authorization` + `Content-Digest`).
+- Runs endpoint tests against `/unprotected` (no token), `/token-check` (valid/invalid Approov tokens), `/token-binding` (token bound to `Authorization`), and `/token-double-binding` (token bound to `Authorization` + `SessionId`).
 - Logs full request/response details to `.config/logs/<timestamp>.log`.
 
 #### *1. Unprotected Endpoint (No Approov)*
@@ -179,16 +190,16 @@ Cache-Control: no-cache
 - The client sends three headers on authenticated API calls:
     - `Approov-Token`
     - `Authorization`
-    - `Content-Digest` It is combined with the `Authorization` header to create a stronger binding.
+    - `SessionId` It is combined with the `Authorization` header to create a stronger binding.
 - Both are included in the hash inside the Approov token. This means the server verifies a single hash that covers both authentication credentials.
 - **Use case:** Stronger protection then single binding by tying both headers together.
 
 ***The following example shows how the API responds when an Approov token with two bindings is required.***
 
-*Generate a valid Approov token bound to the `Authorization` and `Content-Digest` headers:*
+*Generate a valid Approov token bound to the `Authorization` and `SessionId` headers:*
 
 ```bash
-approov token -setDataHashInToken ExampleAuthToken==ContentDigest== -genExample example.com
+approov token -setDataHashInToken ExampleAuthToken==123 -genExample example.com
 ```
 
 *Use the generated token with two bindings in the Approov-Token and Authorization headers when calling the `/token-double-binding` endpoint.*
@@ -197,7 +208,7 @@ approov token -setDataHashInToken ExampleAuthToken==ContentDigest== -genExample 
 curl -iX GET http://localhost:8080/token-double-binding \
      -H "Approov-Token: valid_approov_token_here" \
      -H "Authorization: ExampleAuthToken==" \
-     -H "Content-Digest: ContentDigest=="
+     -H "SessionId: 123"
 ```
 
 The response will be `200 OK` for this request.
@@ -210,7 +221,7 @@ Cache-Control: no-cache
 
 *If you use an invalid or missing header or token, the server will respond with `401 Unauthorized`.*
 
-## Enable or Disable Approov Protection
+## Enable or Disable Approov Protection      
 
 When the example server is running on `localhost:8080`, you can toggle Approov protection with these commands:
 

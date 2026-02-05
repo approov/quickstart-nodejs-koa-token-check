@@ -1,7 +1,7 @@
 'use strict'
 
 const Koa = require('koa')
-const Router = require('koa-router')
+const Router = require('@koa/router')
 const compress = require('koa-compress')
 const logger = require('koa-logger')
 const jwt = require('jsonwebtoken')
@@ -18,7 +18,13 @@ if (envResult.error) {
 
 const APPROOV_HEADER = 'Approov-Token'
 const AUTH_HEADER = 'Authorization'
-const DIGEST_HEADER = 'Content-Digest'
+const SESSION_ID_HEADER = 'SessionId'
+const APPROOV_PLACEHOLDER_SECRET = 'approov_base64url_secret_here'
+
+const ROUTE_BINDING_HEADERS = Object.freeze({
+    '/token-binding': [AUTH_HEADER],
+    '/token-double-binding': [AUTH_HEADER, SESSION_ID_HEADER]
+})
 
 const approovState = {
     approovEnabled: true,
@@ -29,20 +35,71 @@ function hasText(value) {
     return value != null && String(value).trim() !== ''
 }
 
+function formatTimestamp(date = new Date()) {
+    const pad = value => String(value).padStart(2, '0')
+    const year = date.getFullYear()
+    const month = pad(date.getMonth() + 1)
+    const day = pad(date.getDate())
+    const hour = pad(date.getHours())
+    const minute = pad(date.getMinutes())
+    const second = pad(date.getSeconds())
+    return `${year}-${month}-${day} ${hour}:${minute}:${second}`
+}
+
+function logEvent(level, event, payload) {
+    const message = `[${formatTimestamp()}] ${event} ${JSON.stringify(payload)}`
+    if (level === 'error') {
+        console.error(message)
+        return
+    }
+    if (level === 'warn') {
+        console.warn(message)
+        return
+    }
+    console.log(message)
+}
+
+function logSecretIssue(message) {
+    if (!hasText(message)) {
+        return
+    }
+    logEvent('error', 'approov.secret.error', { message })
+}
+
+function isBase64Url(value) {
+    return /^[A-Za-z0-9_-]+$/.test(value) && value.length % 4 !== 1
+}
+
 function loadApproovSecret() {
     const secret = process.env.APPROOV_BASE64URL_SECRET
-    if (!hasText(secret)) throw new Error('APPROOV_BASE64URL_SECRET environment variable is not set')
-    return Buffer.from(secret.trim(), 'base64url')
+    if (!hasText(secret) || secret.trim() === APPROOV_PLACEHOLDER_SECRET) {
+        return { secret: null, error: 'Required secret is not set' }
+    }
 
+    const trimmed = secret.trim()
+    if (!isBase64Url(trimmed)) {
+        return { secret: null, error: 'Required secret is invalid' }
+    }
+
+    try {
+        const decoded = Buffer.from(trimmed, 'base64url')
+        const normalized = trimmed.replace(/=+$/, '')
+        if (decoded.length === 0 || decoded.toString('base64url') !== normalized) {
+            return { secret: null, error: 'Required secret is invalid' }
+        }
+        return { secret: decoded, error: null }
+    } catch (err) {
+        return { secret: null, error: 'Required secret is invalid' }
+    }
 }
 
 let approovSecret
-try {
-    approovSecret = loadApproovSecret()
-} catch (err) {
-    console.error('Failed to load Approov secret. Ensure `.env` exists and APPROOV_BASE64URL_SECRET is set.')
-    console.error(err.message)
-    process.exit(1)
+let approovSecretError
+const secretResult = loadApproovSecret()
+approovSecret = secretResult.secret
+approovSecretError = secretResult.error
+if (approovSecretError) {
+    logSecretIssue(approovSecretError)
 }
 
 function infoPayload(details) {
@@ -69,58 +126,156 @@ function computeBindingHash(value) {
     return crypto.createHash('sha256').update(value, 'utf8').digest('base64')
 }
 
-function getBindingValue(ctx) {
-    if (ctx.path === '/token-binding') {
-        return ctx.get(AUTH_HEADER)
+function toBase64Url(value) {
+    return String(value).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function timingSafeEqualString(value, expected) {
+    const valueBuffer = Buffer.from(String(value), 'utf8')
+    const expectedBuffer = Buffer.from(String(expected), 'utf8')
+    if (valueBuffer.length !== expectedBuffer.length) {
+        return false
+    }
+    return crypto.timingSafeEqual(valueBuffer, expectedBuffer)
+}
+
+function isBindingValid(bindingValue, claims) {
+    const expected = claims && claims.pay
+    if (!hasText(expected)) {
+        return false
     }
 
-    const auth = ctx.get(AUTH_HEADER)
-    const digest = ctx.get(DIGEST_HEADER)
-    if (!hasText(auth) || !hasText(digest)) {
+    const expectedValue = String(expected).trim()
+    const computedBase64 = computeBindingHash(bindingValue)
+    const computedBase64Url = toBase64Url(computedBase64)
+    const matchBase64 = timingSafeEqualString(computedBase64, expectedValue)
+    const matchBase64Url = timingSafeEqualString(computedBase64Url, expectedValue)
+    return matchBase64 || matchBase64Url
+}
+
+function trimOrNull(value) {
+    if (!hasText(value)) {
         return null
     }
+    return String(value).trim()
+}
 
-    return auth + digest
+function getBindingHeaders(path) {
+    return ROUTE_BINDING_HEADERS[path] || []
+}
+
+function requiredHeaders(bindingHeaders) {
+    if (!approovState.approovEnabled) {
+        return []
+    }
+
+    const headers = [APPROOV_HEADER]
+    if (approovState.tokenBindingEnabled && bindingHeaders.length > 0) {
+        headers.push(...bindingHeaders)
+    }
+    return headers
+}
+
+function getBindingValue(ctx, bindingHeaders) {
+    const values = []
+    for (const header of bindingHeaders) {
+        const value = trimOrNull(ctx.get(header))
+        if (!hasText(value)) {
+            return null
+        }
+        values.push(value)
+    }
+
+    return values.join('')
+}
+
+function logRequest(ctx) {
+    const summary = hasText(ctx.state.approovSummary)
+        ? ctx.state.approovSummary
+        : (ctx.status >= 400 ? 'request_failed' : 'request_ok')
+    const payload = {
+        summary,
+        method: ctx.method,
+        path: ctx.path,
+        status: ctx.status,
+        ip: ctx.ip,
+        port: ctx.request.socket ? ctx.request.socket.localPort : null,
+        approovEnabled: approovState.approovEnabled,
+        tokenBindingEnabled: approovState.tokenBindingEnabled,
+        required_headers: ctx.state.approovRequiredHeaders || [],
+        secret_error: approovSecretError || undefined
+    }
+    logEvent(ctx.status >= 500 ? 'error' : 'info', 'http.request.completed', payload)
+}
+
+function failUnauthorized(ctx, reason) {
+    if (hasText(reason)) {
+        ctx.state.approovSummary = `approov_failed:${reason}`
+        ctx.state.approovFailureReason = reason
+    }
+    unauthorized(ctx)
 }
 
 async function verifyApproovToken(ctx, next) {
+    const bindingHeaders = getBindingHeaders(ctx.path)
+    ctx.state.approovRequiredHeaders = requiredHeaders(bindingHeaders)
+
     if (!approovState.approovEnabled) {
+        ctx.state.approovSummary = 'approov_disabled'
         await next()
+        return
+    }
+
+    if (approovSecretError) {
+        const reason = approovSecretError === 'Required secret is not set'
+            ? 'secret_missing'
+            : 'secret_invalid'
+        failUnauthorized(ctx, reason)
         return
     }
 
     const token = ctx.get(APPROOV_HEADER)
     if (!hasText(token)) {
-        unauthorized(ctx)
+        failUnauthorized(ctx, 'missing_approov_token')
         return
     }
 
     try {
         const claims = jwt.verify(token.trim(), approovSecret, { algorithms: ['HS256'] })
+        const exp = claims && claims.exp
+        if (!Number.isFinite(Number(exp))) {
+            failUnauthorized(ctx, 'token_missing_exp')
+            return
+        }
         ctx.state.approovClaims = claims
     } catch (err) {
-        unauthorized(ctx)
+        failUnauthorized(ctx, 'token_verification_failed')
         return
     }
 
-    if (approovState.tokenBindingEnabled && (ctx.path === '/token-binding' || ctx.path === '/token-double-binding')) {
-        const bindingValue = getBindingValue(ctx)
-        const expected = ctx.state.approovClaims && ctx.state.approovClaims.pay
-
-        if (!hasText(bindingValue) || !hasText(expected)) {
-            unauthorized(ctx)
+    if (approovState.tokenBindingEnabled && bindingHeaders.length > 0) {
+        const bindingValue = getBindingValue(ctx, bindingHeaders)
+        if (!hasText(bindingValue)) {
+            failUnauthorized(ctx, 'missing_binding_header')
             return
         }
-
-        const computed = computeBindingHash(bindingValue)
-        if (computed !== expected) {
-            unauthorized(ctx)
+        if (!isBindingValid(bindingValue, ctx.state.approovClaims)) {
+            failUnauthorized(ctx, 'binding_mismatch')
             return
         }
     }
 
+    ctx.state.approovSummary = 'approov_ok'
     await next()
 }
+
+api.use(async (ctx, next) => {
+    try {
+        await next()
+    } finally {
+        logRequest(ctx)
+    }
+})
 
 if (process.env.HTTP_LOG !== 'false') {
   api.use(logger())
@@ -186,7 +341,7 @@ router.get('/token-binding', async ctx => {
 router.get('/token-double-binding', async ctx => {
     const response = infoPayload("Protected endpoint '/token-double-binding'; dual token binding enforced.")
     response.authorizationHeaderPresent = hasText(ctx.get(AUTH_HEADER))
-    response.contentDigestHeaderPresent = hasText(ctx.get(DIGEST_HEADER))
+    response.sessionIdHeaderPresent = hasText(ctx.get(SESSION_ID_HEADER))
     ctx.body = response
 })
 
