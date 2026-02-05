@@ -9,20 +9,21 @@ This project provides a server-side example of Approov token verification for a 
 
 In this example, Approov token check is implemented in `ApproovApplication.js`. The responsibilities break down as follows:
 
-1. **JWT Approov Token validation (signature + expiry)** is implemented in [verifyApproovToken (JWT verification)](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L229-L241)
-It verifies the HS256 signature and rejects tokens that are missing or past `exp`.
+1. **JWT Approov Token validation (signature + expiry)** is implemented in [verifyApproovToken (JWT verification)](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L219-L254)
+It verifies the HS256 signature (via `jwt.verify`) and rejects tokens that are expired or missing a valid `exp` claim.
 
-2. **Token binding (pay + hash)** is handled by [isBindingValid + computeBindingHash](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L125-L146)
-It computes `base64(sha256(binding_value))` and compares it to `pay` with a timing-safe match.
+2. **Token binding (pay + hash)** is handled by [isBindingValid + computeBindingHash](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L125-L153)
+It computes `base64(sha256(binding_value))`, also derives a base64url version, and compares both to `pay` using a timing-safe match.
 
-3. **Middleware enforcement** is done by [verifyApproovToken + failUnauthorized](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L203-L257)
-Requests without valid token/binding are rejected with 401.
+3. **Middleware enforcement** is done by [verifyApproovToken + failUnauthorized](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L211-L269)
+Requests without a valid token or binding are rejected with `401 Unauthorized`.
 
-4. **Binding value selection (what gets hashed)** is in [getBindingHeaders + getBindingValue](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L155-L182) It uses the headers configured in `ROUTE_BINDING_HEADERS` (currently `Authorization` for single binding, or `Authorization` + `SessionId` for double binding).
+4. **Binding value selection (what gets hashed)** is in [getBindingHeaders + getBindingValue](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L163-L189)
+It uses the headers configured in `ROUTE_BINDING_HEADERS` (currently `Authorization` for single binding, or `Authorization` + `SessionId` for double binding), requires all headers to be present, and concatenates their values with no delimiter.
 
 5. **Protected route requirements** are defined in [ROUTE_BINDING_HEADERS](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L24-L27)
 
-6. **Protected routes are registered** in [router.use([...], verifyApproovToken)]([ApproovApplication.js](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js)#L282-L282)
+6. **Protected routes are registered** in [router.use](https://github.com/approov/quickstart-nodejs-koa-token-check/blob/refactor/nodejs-koa-quickstart/ApproovApplication.js#L295-L295)
 
 ## Approov Token Verification Flow
 
