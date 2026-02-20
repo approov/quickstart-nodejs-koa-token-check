@@ -117,9 +117,11 @@ function statePayload() {
     }
 }
 
-function unauthorized(ctx) {
-    ctx.status = 401
-    ctx.body = {}
+function createUnauthorizedError(reason) {
+    const error = new Error('Unauthorized')
+    error.status = 401
+    error.code = hasText(reason) ? `approov_${String(reason).trim()}` : 'approov_unauthorized'
+    return error
 }
 
 function computeBindingHash(value) {
@@ -213,7 +215,7 @@ function failUnauthorized(ctx, reason) {
         ctx.state.approovSummary = `approov_failed:${reason}`
         ctx.state.approovFailureReason = reason
     }
-    unauthorized(ctx)
+    return createUnauthorizedError(reason)
 }
 
 async function verifyApproovToken(ctx, next) {
@@ -230,38 +232,35 @@ async function verifyApproovToken(ctx, next) {
         const reason = approovSecretError === 'Required secret is not set'
             ? 'secret_missing'
             : 'secret_invalid'
-        failUnauthorized(ctx, reason)
-        return
+        throw failUnauthorized(ctx, reason)
     }
 
     const token = ctx.get(APPROOV_HEADER)
     if (!hasText(token)) {
-        failUnauthorized(ctx, 'missing_approov_token')
-        return
+        throw failUnauthorized(ctx, 'missing_approov_token')
     }
 
     try {
         const claims = jwt.verify(token.trim(), approovSecret, { algorithms: ['HS256'] })
         const exp = claims && claims.exp
         if (!Number.isFinite(Number(exp))) {
-            failUnauthorized(ctx, 'token_missing_exp')
-            return
+            throw failUnauthorized(ctx, 'token_missing_exp')
         }
         ctx.state.approovClaims = claims
     } catch (err) {
-        failUnauthorized(ctx, 'token_verification_failed')
-        return
+        if (err && err.status === 401) {
+            throw err
+        }
+        throw failUnauthorized(ctx, 'token_verification_failed')
     }
 
     if (approovState.tokenBindingEnabled && bindingHeaders.length > 0) {
         const bindingValue = getBindingValue(ctx, bindingHeaders)
         if (!hasText(bindingValue)) {
-            failUnauthorized(ctx, 'missing_binding_header')
-            return
+            throw failUnauthorized(ctx, 'missing_binding_header')
         }
         if (!isBindingValid(bindingValue, ctx.state.approovClaims)) {
-            failUnauthorized(ctx, 'binding_mismatch')
-            return
+            throw failUnauthorized(ctx, 'binding_mismatch')
         }
     }
 
