@@ -12,7 +12,7 @@ const api = new Koa()
 const router = new Router()
 
 const envResult = dotenv.config({ quiet: true })
-if (envResult.error) {
+if (envResult.error && envResult.error.code !== 'ENOENT') {
     console.debug('FAILED TO PARSE `.env` FILE | ' + envResult.error)
 }
 
