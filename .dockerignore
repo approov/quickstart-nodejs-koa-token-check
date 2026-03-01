@@ -1,0 +1,23 @@
+# Dependencies installed on host
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# VCS and OS metadata
+.git
+.gitignore
+.DS_Store
+
+# Local test fixtures and logs (not required by runtime container)
+.config/
+
+# Local/CI artifacts
+coverage/
+*.log

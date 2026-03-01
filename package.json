@@ -1,0 +1,20 @@
+{
+  "name": "approov-nodejs-koa-quickstart",
+  "version": "1.0.0",
+  "description": "Approov quickstart for the NodeJS Koa framework.",
+  "main": "./ApproovApplication.js",
+  "scripts": {
+    "test": "bash ./test.sh",
+    "start": "node ./ApproovApplication.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "koa": "^3.1.1",
+    "koa-logger": "^4.0.0",
+    "koa-compress": "^5.1.1",
+    "@koa/router": "^15.3.0",
+    "dotenv": "^17.2.3",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {}
+}
